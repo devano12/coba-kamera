@@ -8,21 +8,29 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      background: #050510;
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #030313;
       overflow: hidden;
       font-family: Arial, sans-serif;
       color: white;
     }
 
-    video { display: none; }
+    video {
+      position: fixed;
+      opacity: 0;
+      pointer-events: none;
+      width: 1px;
+      height: 1px;
+    }
 
     canvas {
       position: fixed;
       inset: 0;
       width: 100vw;
       height: 100vh;
-      background: radial-gradient(circle at center, #191933, #050510 70%);
+      background: #030313;
     }
 
     .info {
@@ -34,9 +42,10 @@
       padding: 10px 16px;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
       font-size: 14px;
       text-align: center;
+      box-shadow: 0 0 24px rgba(255, 80, 210, 0.28);
     }
 
     .start {
@@ -46,7 +55,7 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      background: radial-gradient(circle at center, #22224a, #050510 70%);
+      background: radial-gradient(circle at center, #25114a, #060616 75%);
     }
 
     .start button {
@@ -57,16 +66,16 @@
       font-weight: bold;
       color: white;
       background: linear-gradient(135deg, #ff4fd8, #7c4dff, #00d4ff);
-      box-shadow: 0 0 30px rgba(255, 79, 216, 0.45);
+      box-shadow: 0 0 40px rgba(255, 79, 216, 0.55);
     }
   </style>
 </head>
 <body>
   <div class="start" id="startScreen">
-    <button id="startBtn">Mulai Efek Kamera ✨</button>
+    <button id="startBtn">Mulai Efek Love ✨</button>
   </div>
 
-  <div class="info" id="info">Kamera hanya dipakai untuk deteksi tangan, wajah tidak ditampilkan</div>
+  <div class="info" id="info">Kamera hanya untuk deteksi tangan, gambar kamera tidak ditampilkan</div>
 
   <video id="video" autoplay playsinline muted></video>
   <canvas id="canvas"></canvas>
@@ -88,55 +97,98 @@
     canvas.height = height;
 
     const particles = [];
+    const stars = [];
+    const bursts = [];
+    const rings = [];
+
     let loveActive = false;
     let handX = width / 2;
     let handY = height / 2;
     let smoothHandX = width / 2;
     let smoothHandY = height / 2;
+    let time = 0;
     let camera = null;
 
-    window.addEventListener("resize", () => {
+    function random(min, max) {
+      return Math.random() * (max - min) + min;
+    }
+
+    function resize() {
       width = window.innerWidth;
       height = window.innerHeight;
-      canvas.width = width;
-      canvas.height = height;
-    });
+      canvas.width = width * devicePixelRatio;
+      canvas.height = height * devicePixelRatio;
+      canvas.style.width = width + "px";
+      canvas.style.height = height + "px";
+      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      createStars();
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    function createStars() {
+      stars.length = 0;
+      const count = Math.floor((width * height) / 6500);
+
+      for (let i = 0; i < count; i++) {
+        stars.push({
+          x: Math.random() * width,
+          y: Math.random() * height,
+          r: random(0.6, 2.2),
+          hue: random(180, 330),
+          speed: random(0.15, 0.7),
+          twinkle: random(0, Math.PI * 2)
+        });
+      }
+    }
 
     function heartPoint(t, centerX, centerY, scale) {
       const x = 16 * Math.pow(Math.sin(t), 3);
-      const y = -(
-        13 * Math.cos(t) -
-        5 * Math.cos(2 * t) -
-        2 * Math.cos(3 * t) -
-        Math.cos(4 * t)
-      );
-
-      return {
-        x: centerX + x * scale,
-        y: centerY + y * scale
-      };
+      const y = -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+      return { x: centerX + x * scale, y: centerY + y * scale };
     }
 
     function createLoveParticles(startX, startY) {
       particles.length = 0;
-      const scale = Math.min(width, height) * 0.014;
+      const scale = Math.min(width, height) * 0.016;
 
-      for (let i = 0; i < 280; i++) {
+      for (let i = 0; i < 430; i++) {
         const t = Math.random() * Math.PI * 2;
         const target = heartPoint(t, startX, startY - 110, scale);
 
         particles.push({
-          x: startX + (Math.random() - 0.5) * 100,
-          y: startY + (Math.random() - 0.5) * 100,
-          t,
+          x: startX + random(-140, 140),
+          y: startY + random(-140, 140),
           offsetX: target.x - startX,
           offsetY: target.y - (startY - 110),
           tx: target.x,
           ty: target.y,
-          size: Math.random() * 3 + 2,
-          speed: Math.random() * 0.04 + 0.025,
-          hue: Math.random() * 360,
-          glow: Math.random() * 24 + 10
+          size: random(1.8, 4.8),
+          speed: random(0.035, 0.075),
+          hue: random(0, 360),
+          glow: random(14, 34),
+          orbit: random(0, Math.PI * 2),
+          orbitSize: random(1, 10)
+        });
+      }
+
+      createBurst(startX, startY - 60, 80);
+      rings.push({ x: startX, y: startY - 90, r: 10, life: 1, hue: random(280, 340) });
+    }
+
+    function createBurst(x, y, count = 40) {
+      for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = random(2, 9);
+        bursts.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 1,
+          decay: random(0.015, 0.035),
+          size: random(2, 6),
+          hue: random(0, 360)
         });
       }
     }
@@ -145,61 +197,147 @@
       const tips = [8, 12, 16, 20];
       const pips = [6, 10, 14, 18];
       let openFingers = 0;
-
       for (let i = 0; i < tips.length; i++) {
         if (landmarks[tips[i]].y < landmarks[pips[i]].y) openFingers++;
       }
-
       return openFingers >= 4;
     }
 
     function drawBackground() {
-      ctx.fillStyle = "rgba(5, 5, 16, 0.32)";
+      const g = ctx.createRadialGradient(
+        smoothHandX, smoothHandY, 20,
+        smoothHandX, smoothHandY, Math.max(width, height) * 0.9
+      );
+
+      g.addColorStop(0, loveActive ? "rgba(95, 20, 120, 0.95)" : "rgba(25, 12, 55, 0.95)");
+      g.addColorStop(0.45, "rgba(7, 8, 35, 0.96)");
+      g.addColorStop(1, "rgba(3, 3, 19, 1)");
+      ctx.fillStyle = g;
       ctx.fillRect(0, 0, width, height);
+
+      for (const s of stars) {
+        s.y += s.speed;
+        s.twinkle += 0.04;
+        if (s.y > height + 10) {
+          s.y = -10;
+          s.x = Math.random() * width;
+        }
+
+        const alpha = 0.35 + Math.sin(s.twinkle) * 0.25;
+        ctx.beginPath();
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = `hsla(${s.hue}, 100%, 70%, ${alpha})`;
+        ctx.fillStyle = `hsla(${s.hue}, 100%, 75%, ${alpha})`;
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    function drawHandAura() {
+      if (!loveActive) return;
+
+      for (let i = 0; i < 3; i++) {
+        const radius = 60 + i * 32 + Math.sin(time * 0.05 + i) * 10;
+        ctx.beginPath();
+        ctx.strokeStyle = `hsla(${300 + i * 25}, 100%, 70%, ${0.22 - i * 0.05})`;
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 25;
+        ctx.shadowColor = `hsl(${300 + i * 25}, 100%, 65%)`;
+        ctx.arc(smoothHandX, smoothHandY, radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
     }
 
     function drawParticles() {
-      smoothHandX += (handX - smoothHandX) * 0.16;
-      smoothHandY += (handY - smoothHandY) * 0.16;
+      smoothHandX += (handX - smoothHandX) * 0.18;
+      smoothHandY += (handY - smoothHandY) * 0.18;
 
       for (const p of particles) {
         if (loveActive) {
-          p.tx = smoothHandX + p.offsetX;
-          p.ty = smoothHandY - 110 + p.offsetY;
+          p.orbit += 0.055;
+          p.tx = smoothHandX + p.offsetX + Math.cos(p.orbit) * p.orbitSize;
+          p.ty = smoothHandY - 110 + p.offsetY + Math.sin(p.orbit) * p.orbitSize;
         } else {
-          p.tx += (Math.random() - 0.5) * 12;
-          p.ty += (Math.random() - 0.5) * 12;
+          p.tx += random(-10, 10);
+          p.ty += random(-10, 10);
         }
 
         p.x += (p.tx - p.x) * p.speed;
         p.y += (p.ty - p.y) * p.speed;
-        p.hue += 1.5;
+        p.hue += 1.8;
 
         ctx.beginPath();
         ctx.shadowBlur = p.glow;
-        ctx.shadowColor = `hsl(${p.hue}, 100%, 65%)`;
-        ctx.fillStyle = `hsl(${p.hue}, 100%, 65%)`;
+        ctx.shadowColor = `hsl(${p.hue}, 100%, 67%)`;
+        ctx.fillStyle = `hsl(${p.hue}, 100%, 67%)`;
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
         ctx.shadowBlur = 0;
       }
     }
 
-    function drawHandGlow() {
+    function drawBursts() {
+      for (let i = bursts.length - 1; i >= 0; i--) {
+        const b = bursts[i];
+        b.x += b.vx;
+        b.y += b.vy;
+        b.vx *= 0.97;
+        b.vy *= 0.97;
+        b.life -= b.decay;
+
+        ctx.beginPath();
+        ctx.shadowBlur = 20;
+        ctx.shadowColor = `hsla(${b.hue}, 100%, 70%, ${b.life})`;
+        ctx.fillStyle = `hsla(${b.hue}, 100%, 70%, ${b.life})`;
+        ctx.arc(b.x, b.y, b.size * b.life, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        if (b.life <= 0) bursts.splice(i, 1);
+      }
+    }
+
+    function drawRings() {
+      for (let i = rings.length - 1; i >= 0; i--) {
+        const r = rings[i];
+        r.r += 4.2;
+        r.life -= 0.018;
+        ctx.beginPath();
+        ctx.strokeStyle = `hsla(${r.hue}, 100%, 70%, ${r.life})`;
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 24;
+        ctx.shadowColor = `hsl(${r.hue}, 100%, 65%)`;
+        ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        if (r.life <= 0) rings.splice(i, 1);
+      }
+    }
+
+    function drawMiniHearts() {
       if (!loveActive) return;
-      const gradient = ctx.createRadialGradient(smoothHandX, smoothHandY, 5, smoothHandX, smoothHandY, 90);
-      gradient.addColorStop(0, "rgba(255, 120, 230, 0.35)");
-      gradient.addColorStop(1, "rgba(255, 120, 230, 0)");
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(smoothHandX, smoothHandY, 90, 0, Math.PI * 2);
-      ctx.fill();
+
+      for (let i = 0; i < 6; i++) {
+        const a = time * 0.018 + i * Math.PI * 0.33;
+        const x = smoothHandX + Math.cos(a) * (120 + i * 9);
+        const y = smoothHandY - 110 + Math.sin(a * 1.3) * (80 + i * 6);
+        ctx.font = `${18 + i}px Arial`;
+        ctx.globalAlpha = 0.4;
+        ctx.fillText("💖", x, y);
+        ctx.globalAlpha = 1;
+      }
     }
 
     function animate() {
+      time++;
       drawBackground();
-      drawHandGlow();
+      drawHandAura();
+      drawRings();
       drawParticles();
+      drawBursts();
+      drawMiniHearts();
       requestAnimationFrame(animate);
     }
 
@@ -223,16 +361,22 @@
 
       const landmarks = results.multiHandLandmarks[0];
       const wrist = landmarks[0];
-
       handX = width - wrist.x * width;
       handY = wrist.y * height;
 
       if (isOpenPalm(landmarks)) {
         info.textContent = "Telapak terbuka 🖐️ Love mengikuti tangan 💖";
-
         if (!loveActive) {
           createLoveParticles(handX, handY);
           loveActive = true;
+        }
+
+        if (time % 18 === 0) {
+          createBurst(smoothHandX + random(-60, 60), smoothHandY - 110 + random(-60, 60), 10);
+        }
+
+        if (time % 55 === 0) {
+          rings.push({ x: smoothHandX, y: smoothHandY - 90, r: 10, life: 1, hue: random(260, 360) });
         }
       } else {
         info.textContent = "Buka telapak tangan untuk membuat love";
