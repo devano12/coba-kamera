@@ -7,7 +7,6 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     html, body {
       width: 100%;
       height: 100%;
@@ -15,8 +14,8 @@
       overflow: hidden;
       font-family: Arial, sans-serif;
       color: white;
+      touch-action: none;
     }
-
     video {
       position: fixed;
       opacity: 0;
@@ -24,7 +23,6 @@
       width: 1px;
       height: 1px;
     }
-
     canvas {
       position: fixed;
       inset: 0;
@@ -32,7 +30,6 @@
       height: 100vh;
       background: #030313;
     }
-
     .info {
       position: fixed;
       top: 16px;
@@ -42,12 +39,11 @@
       padding: 10px 16px;
       border-radius: 999px;
       background: rgba(255, 255, 255, 0.12);
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(10px);
       font-size: 14px;
       text-align: center;
-      box-shadow: 0 0 24px rgba(255, 80, 210, 0.28);
+      max-width: 92vw;
     }
-
     .start {
       position: fixed;
       inset: 0;
@@ -57,7 +53,6 @@
       align-items: center;
       background: radial-gradient(circle at center, #25114a, #060616 75%);
     }
-
     .start button {
       border: 0;
       border-radius: 999px;
@@ -66,7 +61,7 @@
       font-weight: bold;
       color: white;
       background: linear-gradient(135deg, #ff4fd8, #7c4dff, #00d4ff);
-      box-shadow: 0 0 40px rgba(255, 79, 216, 0.55);
+      box-shadow: 0 0 30px rgba(255, 79, 216, 0.45);
     }
   </style>
 </head>
@@ -81,20 +76,18 @@
   <canvas id="canvas"></canvas>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 
   <script>
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext("2d", { alpha: false });
     const info = document.getElementById("info");
     const startScreen = document.getElementById("startScreen");
     const startBtn = document.getElementById("startBtn");
 
     let width = window.innerWidth;
     let height = window.innerHeight;
-    canvas.width = width;
-    canvas.height = height;
+    let pixelRatio = 1;
 
     const particles = [];
     const stars = [];
@@ -107,7 +100,9 @@
     let smoothHandX = width / 2;
     let smoothHandY = height / 2;
     let time = 0;
-    let camera = null;
+    let isProcessing = false;
+    let lastDetectTime = 0;
+    let appStarted = false;
 
     function random(min, max) {
       return Math.random() * (max - min) + min;
@@ -116,11 +111,15 @@
     function resize() {
       width = window.innerWidth;
       height = window.innerHeight;
-      canvas.width = width * devicePixelRatio;
-      canvas.height = height * devicePixelRatio;
+
+      // Penting untuk iPhone: jangan pakai devicePixelRatio tinggi karena bisa freeze.
+      pixelRatio = Math.min(window.devicePixelRatio || 1, 1.25);
+
+      canvas.width = Math.floor(width * pixelRatio);
+      canvas.height = Math.floor(height * pixelRatio);
       canvas.style.width = width + "px";
       canvas.style.height = height + "px";
-      ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+      ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
       createStars();
     }
 
@@ -129,12 +128,14 @@
 
     function createStars() {
       stars.length = 0;
-      const count = Math.floor((width * height) / 12000);stars.push({
+      const count = Math.min(70, Math.floor((width * height) / 16000));
+      for (let i = 0; i < count; i++) {
+        stars.push({
           x: Math.random() * width,
           y: Math.random() * height,
-          r: random(0.6, 2.2),
+          r: random(0.7, 1.8),
           hue: random(180, 330),
-          speed: random(0.15, 0.7),
+          speed: random(0.12, 0.45),
           twinkle: random(0, Math.PI * 2)
         });
       }
@@ -148,37 +149,44 @@
 
     function createLoveParticles(startX, startY) {
       particles.length = 0;
-      const scale = Math.min(width, height) * 0.022;
+      const scale = Math.min(width, height) * 0.02;
+      const total = 260;
 
-      for (let i = 0; i < 750; i++) {
-        const t = for (let i = 0; i < 360; i++)        const target = heartPoint(t, startX, startY - 110, scale);
-
+      for (let i = 0; i < total; i++) {
+        const t = Math.random() * Math.PI * 2;
+        const target = heartPoint(t, startX, startY - 100, scale);
         particles.push({
-          x: startX + random(-140, 140),
-          y: startY + random(-140, 140),
+          x: startX + random(-90, 90),
+          y: startY + random(-90, 90),
           offsetX: target.x - startX,
-          offsetY: target.y - (startY - 110),
+          offsetY: target.y - (startY - 100),
           tx: target.x,
           ty: target.y,
-          size: random(1.8, 4.8),
-          ,
+          size: random(2, 4.5),
+          speed: random(0.14, 0.26),
           hue: random(0, 360),
-          glow: rspeed: random(0.12, 0.22)h.PI * 2),
-          orbitSize: random(4, 1glow: random(8, 18) }tX, startY - 60, 80);
-      rings.push({ x: startX,orbitSize: random(3, 12)life: 1, hue: random(280, 340) });
+          orbit: random(0, Math.PI * 2),
+          orbitSize: random(2, 9)
+        });
+      }
+
+      createBurst(startX, startY - 60, 28);
+      rings.push({ x: startX, y: startY - 90, r: 10, life: 1, hue: random(280, 340) });
     }
 
-    function createBurst(x, y, count = 40) {
+    function createBurst(x, y, count = 12) {
+      const limit = 70;
       for (let i = 0; i < count; i++) {
+        if (bursts.length > limit) bursts.shift();
         const angle = Math.random() * Math.PI * 2;
-        const speed = random(2, 9);
+        const speed = random(2, 6);
         bursts.push({
           x, y,
           vx: Math.cos(angle) * speed,
           vy: Math.sin(angle) * speed,
           life: 1,
-          decay: random(0.015, 0.035),
-          size: random(2, 6),
+          decay: random(0.035, 0.055),
+          size: random(2, 5),
           hue: random(0, 360)
         });
       }
@@ -195,14 +203,10 @@
     }
 
     function drawBackground() {
-      const g = ctx.createRadialGradient(
-        smoothHandX, smoothHandY, 20,
-        smoothHandX, smoothHandY, Math.max(width, height) * 0.9
-      );
-
-      g.addColorStop(0, loveActive ? "rgba(95, 20, 120, 0.95)" : "rgba(25, 12, 55, 0.95)");
-      g.addColorStop(0.45, "rgba(7, 8, 35, 0.96)");
-      g.addColorStop(1, "rgba(3, 3, 19, 1)");
+      const g = ctx.createRadialGradient(smoothHandX, smoothHandY, 20, smoothHandX, smoothHandY, Math.max(width, height));
+      g.addColorStop(0, loveActive ? "rgb(70, 18, 95)" : "rgb(18, 12, 48)");
+      g.addColorStop(0.45, "rgb(7, 8, 35)");
+      g.addColorStop(1, "rgb(3, 3, 19)");
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, width, height);
 
@@ -213,49 +217,45 @@
           s.y = -10;
           s.x = Math.random() * width;
         }
-
         const alpha = 0.35 + Math.sin(s.twinkle) * 0.25;
-        ctx.beginPath();
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = `hsla(${s.hue}, 100%, 70%, ${alpha})`;
         ctx.fillStyle = `hsla(${s.hue}, 100%, 75%, ${alpha})`;
+        ctx.beginPath();
         ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
       }
     }
 
     function drawHandAura() {
       if (!loveActive) return;
-
-      for (let i = 0; i < 3; i++) {
-        const radius = 90 + i * 42 + Math.sin(time * 0.14 + i) * 18;
+      for (let i = 0; i < 2; i++) {
+        const radius = 65 + i * 34 + Math.sin(time * 0.14 + i) * 10;
         ctx.beginPath();
-        ctx.strokeStyle = `hsla($const radius = 70 + i * 34 + Math.sin(time * 0.14 + i) * 12;dowColor = `hsl(${300 + i * 25}, 100%, 65%)`;
+        ctx.strokeStyle = `hsla(${300 + i * 25}, 100%, 70%, ${0.28 - i * 0.08})`;
+        ctx.lineWidth = 3;
         ctx.arc(smoothHandX, smoothHandY, radius, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.shadowBlur = 18;unction drawParticles() {
-      smoothHandX += (handX - smoothHandX) * 0.38;
-      smoothHandY += (handY - smoothHandY) * 0.38;
+      }
+    }
+
+    function drawParticles() {
+      smoothHandX += (handX - smoothHandX) * 0.42;
+      smoothHandY += (handY - smoothHandY) * 0.42;
 
       for (const p of particles) {
         if (loveActive) {
           p.orbit += 0.16;
           p.tx = smoothHandX + p.offsetX + Math.cos(p.orbit) * p.orbitSize;
-          p.ty = smoothHandY - 110 + p.offsetY + Math.sin(p.orbit) * p.orbitSize;
-        } else {
-          p.tx += random(-10, 10);
-          p.ty += random(-10, 10);
+          p.ty = smoothHandY - 100 + p.offsetY + Math.sin(p.orbit) * p.orbitSize;
         }
 
         p.x += (p.tx - p.x) * p.speed;
         p.y += (p.ty - p.y) * p.speed;
-        p.hue += 1.8;
+        p.hue += 2.4;
 
+        ctx.fillStyle = `hsl(${p.hue}, 100%, 67%)`;
         ctx.beginPath();
-        ctx.shadowBlur = p.glow;
-        ctx.shadowColor = `hsl(${p.hue}, 10();
-        ctx.shadowBlur = 0;
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
 
@@ -264,18 +264,13 @@
         const b = bursts[i];
         b.x += b.vx;
         b.y += b.vy;
-        b.vx *= 0.97;
-        b.vy *= 0.97;
+        b.vx *= 0.94;
+        b.vy *= 0.94;
         b.life -= b.decay;
-
-        ctx.beginPath();
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = `hsla(${b.hue}, 100%, 70%, ${b.life})`;
         ctx.fillStyle = `hsla(${b.hue}, 100%, 70%, ${b.life})`;
+        ctx.beginPath();
         ctx.arc(b.x, b.y, b.size * b.life, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0;
-
         if (b.life <= 0) bursts.splice(i, 1);
       }
     }
@@ -283,33 +278,34 @@
     function drawRings() {
       for (let i = rings.length - 1; i >= 0; i--) {
         const r = rings[i];
-        r.r += 4.2;
-        r.life -= 0.018;
+        r.r += 5;
+        r.life -= 0.035;
         ctx.beginPath();
         ctx.strokeStyle = `hsla(${r.hue}, 100%, 70%, ${r.life})`;
-        ctx.lineWidth = 4;
-        ctx.shadowBlur = 24;
-        ctx.shadowColor = `hsl(${r.hue}, 100%, 65%)`;
+        ctx.lineWidth = 3;
         ctx.arc(r.x, r.y, r.r, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.shadowBlur = 0;
         if (r.life <= 0) rings.splice(i, 1);
       }
     }
 
     function drawMiniHearts() {
       if (!loveActive) return;
-
-      for (let i = 0; i < 6; i++) {
-        const a = time * 0.018 + i * Math.PI * 0.33;
-        const x = smoothHandX + Math.cos(a) * (12tx.font = `${28 + i * 2}px Arial`;
-        ctx.globalAlpha = 0.75;
+      for (let i = 0; i < 4; i++) {
+        const a = time * 0.035 + i * Math.PI * 0.45;
+        const x = smoothHandX + Math.cos(a) * (110 + i * 8);
+        const y = smoothHandY - 100 + Math.sin(a * 1.4) * (70 + i * 5);
+        ctx.font = `${24 + i * 2}px Arial`;
+        ctx.globalAlpha = 0.85;
         ctx.fillText("💖", x, y);
         ctx.globalAlpha = 1;
- function drawMiniHearts() {
-      if (!loveActive) return;
+      }
+    }
 
-      for (let i = 0; i < 4; i++)ra();
+    function animate() {
+      time++;
+      drawBackground();
+      drawHandAura();
       drawRings();
       drawParticles();
       drawBursts();
@@ -323,9 +319,9 @@
 
     hands.setOptions({
       maxNumHands: 1,
-      modelComplexity: 1,
-      minDetectionConfidence: 0.7,
-      minTrackingConfidence: 0.7
+      modelComplexity: 0,
+      minDetectionConfidence: 0.65,
+      minTrackingConfidence: 0.65
     });
 
     hands.onResults(results => {
@@ -346,24 +342,59 @@
           createLoveParticles(handX, handY);
           loveActive = true;
         }
-
-        if (time % 6 === 0) {
-          createBurst(smoothHandX + random(-90- 110 + random(-90, 90), 28);
-   othHandY - 90, r: 10, life: 1, hue: random(260, 360) });
-        }
+        if (time % 20 === 0) createBurst(smoothHandX + random(-70, 70), smoothHandY - 100 + random(-70, 70), 8);
+        if (time % 60 === 0 && rings.length < 3) rings.push({ x: smoothHandX, y: smoothHandY - 90, r: 10, life: 1, hue: random(260, 360) });
       } else {
-        info.textConteangan untuk membuat love";
+        info.textContent = "Buka telapak tangan untuk membuat love";
         loveActive = false;
       }
     });
+
+    async function detectionLoop() {
+      if (!appStarted) return;
+
+      const now = performance.now();
+      // Deteksi tangan dibatasi sekitar 12 FPS supaya HP tidak freeze.
+      if (!isProcessing && now - lastDetectTime > 83 && video.readyState >= 2) {
+        isProcessing = true;
+        lastDetectTime = now;
+        try {
+          await hands.send({ image: video });
+        } catch (err) {
+          console.log(err);
+        }
+        isProcessing = false;
+      }
+
+      requestAnimationFrame(detectionLoop);
+    }
 
     async function startApp() {
       startScreen.style.display = "none";
       info.textContent = "Meminta izin kamera...";
 
-      camera = new if (time % 14 === 0)     onFrame:createBurst(smoothHandX + random(-80, 80), smoothHandY - 110 + random(-80, 80), 12);h: 640,
-        heigif (time % 45 === 0)     camera.start();
-      animate();
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 320 },
+            height: { ideal: 240 },
+            frameRate: { ideal: 15, max: 20 }
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        await video.play();
+
+        appStarted = true;
+        info.textContent = "Buka telapak tangan untuk membuat love";
+        animate();
+        detectionLoop();
+      } catch (err) {
+        info.textContent = "Kamera gagal dibuka. Pastikan izin kamera aktif dan buka lewat HTTPS/GitHub Pages.";
+        console.log(err);
+      }
     }
 
     startBtn.addEventListener("click", startApp);
