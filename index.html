@@ -6,11 +6,7 @@
   <title>Hand Love Particle</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       background: #050510;
@@ -19,9 +15,7 @@
       color: white;
     }
 
-    video {
-      display: none;
-    }
+    video { display: none; }
 
     canvas {
       position: fixed;
@@ -44,12 +38,37 @@
       font-size: 14px;
       text-align: center;
     }
+
+    .start {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle at center, #22224a, #050510 70%);
+    }
+
+    .start button {
+      border: 0;
+      border-radius: 999px;
+      padding: 16px 24px;
+      font-size: 16px;
+      font-weight: bold;
+      color: white;
+      background: linear-gradient(135deg, #ff4fd8, #7c4dff, #00d4ff);
+      box-shadow: 0 0 30px rgba(255, 79, 216, 0.45);
+    }
   </style>
 </head>
 <body>
-  <div class="info" id="info">Izinkan kamera, lalu buka telapak tangan 🖐️</div>
+  <div class="start" id="startScreen">
+    <button id="startBtn">Mulai Efek Kamera ✨</button>
+  </div>
 
-  <video id="video" autoplay playsinline></video>
+  <div class="info" id="info">Kamera hanya dipakai untuk deteksi tangan, wajah tidak ditampilkan</div>
+
+  <video id="video" autoplay playsinline muted></video>
   <canvas id="canvas"></canvas>
 
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -60,6 +79,8 @@
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
     const info = document.getElementById("info");
+    const startScreen = document.getElementById("startScreen");
+    const startBtn = document.getElementById("startBtn");
 
     let width = window.innerWidth;
     let height = window.innerHeight;
@@ -70,6 +91,9 @@
     let loveActive = false;
     let handX = width / 2;
     let handY = height / 2;
+    let smoothHandX = width / 2;
+    let smoothHandY = height / 2;
+    let camera = null;
 
     window.addEventListener("resize", () => {
       width = window.innerWidth;
@@ -78,7 +102,7 @@
       canvas.height = height;
     });
 
-    function heartPoint(t, scale = 12) {
+    function heartPoint(t, centerX, centerY, scale) {
       const x = 16 * Math.pow(Math.sin(t), 3);
       const y = -(
         13 * Math.cos(t) -
@@ -88,27 +112,31 @@
       );
 
       return {
-        x: width / 2 + x * scale,
-        y: height / 2 + y * scale
+        x: centerX + x * scale,
+        y: centerY + y * scale
       };
     }
 
     function createLoveParticles(startX, startY) {
       particles.length = 0;
+      const scale = Math.min(width, height) * 0.014;
 
-      for (let i = 0; i < 260; i++) {
+      for (let i = 0; i < 280; i++) {
         const t = Math.random() * Math.PI * 2;
-        const target = heartPoint(t, Math.min(width, height) * 0.018);
+        const target = heartPoint(t, startX, startY - 110, scale);
 
         particles.push({
-          x: startX + (Math.random() - 0.5) * 120,
-          y: startY + (Math.random() - 0.5) * 120,
+          x: startX + (Math.random() - 0.5) * 100,
+          y: startY + (Math.random() - 0.5) * 100,
+          t,
+          offsetX: target.x - startX,
+          offsetY: target.y - (startY - 110),
           tx: target.x,
           ty: target.y,
           size: Math.random() * 3 + 2,
-          speed: Math.random() * 0.035 + 0.02,
+          speed: Math.random() * 0.04 + 0.025,
           hue: Math.random() * 360,
-          glow: Math.random() * 20 + 10
+          glow: Math.random() * 24 + 10
         });
       }
     }
@@ -116,23 +144,36 @@
     function isOpenPalm(landmarks) {
       const tips = [8, 12, 16, 20];
       const pips = [6, 10, 14, 18];
-
       let openFingers = 0;
 
       for (let i = 0; i < tips.length; i++) {
-        if (landmarks[tips[i]].y < landmarks[pips[i]].y) {
-          openFingers++;
-        }
+        if (landmarks[tips[i]].y < landmarks[pips[i]].y) openFingers++;
       }
 
       return openFingers >= 4;
     }
 
+    function drawBackground() {
+      ctx.fillStyle = "rgba(5, 5, 16, 0.32)";
+      ctx.fillRect(0, 0, width, height);
+    }
+
     function drawParticles() {
+      smoothHandX += (handX - smoothHandX) * 0.16;
+      smoothHandY += (handY - smoothHandY) * 0.16;
+
       for (const p of particles) {
+        if (loveActive) {
+          p.tx = smoothHandX + p.offsetX;
+          p.ty = smoothHandY - 110 + p.offsetY;
+        } else {
+          p.tx += (Math.random() - 0.5) * 12;
+          p.ty += (Math.random() - 0.5) * 12;
+        }
+
         p.x += (p.tx - p.x) * p.speed;
         p.y += (p.ty - p.y) * p.speed;
-        p.hue += 1.2;
+        p.hue += 1.5;
 
         ctx.beginPath();
         ctx.shadowBlur = p.glow;
@@ -144,23 +185,20 @@
       }
     }
 
-    function drawBackground() {
-      ctx.fillStyle = "rgba(5, 5, 16, 0.25)";
-      ctx.fillRect(0, 0, width, height);
-    }
-
-    function renderCameraToCanvas() {
-      ctx.save();
-      ctx.globalAlpha = 0.2;
-      ctx.translate(width, 0);
-      ctx.scale(-1, 1);
-      ctx.drawImage(video, 0, 0, width, height);
-      ctx.restore();
+    function drawHandGlow() {
+      if (!loveActive) return;
+      const gradient = ctx.createRadialGradient(smoothHandX, smoothHandY, 5, smoothHandX, smoothHandY, 90);
+      gradient.addColorStop(0, "rgba(255, 120, 230, 0.35)");
+      gradient.addColorStop(1, "rgba(255, 120, 230, 0)");
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(smoothHandX, smoothHandY, 90, 0, Math.PI * 2);
+      ctx.fill();
     }
 
     function animate() {
       drawBackground();
-      renderCameraToCanvas();
+      drawHandGlow();
       drawParticles();
       requestAnimationFrame(animate);
     }
@@ -190,7 +228,7 @@
       handY = wrist.y * height;
 
       if (isOpenPalm(landmarks)) {
-        info.textContent = "Telapak terbuka 🖐️ Love muncul 💖";
+        info.textContent = "Telapak terbuka 🖐️ Love mengikuti tangan 💖";
 
         if (!loveActive) {
           createLoveParticles(handX, handY);
@@ -202,16 +240,23 @@
       }
     });
 
-    const camera = new Camera(video, {
-      onFrame: async () => {
-        await hands.send({ image: video });
-      },
-      width: 640,
-      height: 480
-    });
+    async function startApp() {
+      startScreen.style.display = "none";
+      info.textContent = "Meminta izin kamera...";
 
-    camera.start();
-    animate();
+      camera = new Camera(video, {
+        onFrame: async () => {
+          await hands.send({ image: video });
+        },
+        width: 640,
+        height: 480
+      });
+
+      camera.start();
+      animate();
+    }
+
+    startBtn.addEventListener("click", startApp);
   </script>
 </body>
 </html>
